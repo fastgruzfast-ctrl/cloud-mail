@@ -31,6 +31,7 @@ import {emailList, emailDelete, emailLatest, emailRead} from "@/request/email.js
 import {starAdd, starCancel} from "@/request/star.js";
 import {defineOptions, h, onMounted, reactive, ref, watch} from "vue";
 import {sleep} from "@/utils/time-utils.js";
+import {notifyNewMail} from "@/utils/notify.js";
 import router from "@/router/index.js";
 import {Icon} from "@iconify/vue";
 import { useRoute } from 'vue-router'
@@ -112,6 +113,7 @@ async function latest() {
 
                 existIds.add(email.emailId)
                 scroll.value.addItem(email)
+                notifyNewMail(email)
 
                 await sleep(50)
               }

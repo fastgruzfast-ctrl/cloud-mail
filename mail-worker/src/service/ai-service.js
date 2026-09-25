@@ -66,6 +66,67 @@ const aiService = {
 		const fromDomain = emailUtils.getDomain(fromEmail).toLowerCase();
 
 		return filterList.some(item => item === fromEmail || item === fromDomain);
+	},
+
+	getBodyText(email) {
+		const text = emailUtils.formatText(email.text || '');
+		const htmlText = emailUtils.htmlToText(email.content || '');
+		return (text || htmlText || '').slice(0, 4000);
+	},
+
+	async summarize(c, email) {
+		const body = this.getBodyText(email);
+		if (!body) {
+			return '';
+		}
+		try {
+			const result = await c.env.ai.run(c.env.ai_model || '@cf/meta/llama-3.1-8b-instruct-fast', {
+				messages: [
+					{
+						role: 'system',
+						content: '你是一个邮件助手。请用中文简洁总结下面这封邮件的核心内容，3-5句话，只输出摘要本身，不要输出多余解释。'
+					},
+					{
+						role: 'user',
+						content: body
+					}
+				],
+				temperature: 0.3,
+				max_tokens: 512
+			});
+			return typeof result === 'string' ? result : result?.response || '';
+		} catch (e) {
+			console.error('邮件摘要失败: ', e);
+			return '';
+		}
+	},
+
+	async translate(c, email, targetLang = 'zh') {
+		const body = this.getBodyText(email);
+		if (!body) {
+			return '';
+		}
+		const langName = targetLang === 'en' ? '英文' : '中文';
+		try {
+			const result = await c.env.ai.run(c.env.ai_model || '@cf/meta/llama-3.1-8b-instruct-fast', {
+				messages: [
+					{
+						role: 'system',
+						content: `你是一个翻译助手。请把下面这封邮件的正文完整翻译成${langName}，只输出译文本身，不要输出多余解释。`
+					},
+					{
+						role: 'user',
+						content: body
+					}
+				],
+				temperature: 0.3,
+				max_tokens: 2048
+			});
+			return typeof result === 'string' ? result : result?.response || '';
+		} catch (e) {
+			console.error('邮件翻译失败: ', e);
+			return '';
+		}
 	}
 };
 

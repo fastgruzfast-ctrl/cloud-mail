@@ -25,6 +25,7 @@
                 <template #dropdown>
                   <el-dropdown-menu>
                     <el-dropdown-item v-if="hasPerm('email:send')" @click="openSetName(item)">{{ $t('rename') }}</el-dropdown-item>
+                    <el-dropdown-item v-if="hasPerm('email:send')" @click="openSignature(item)">{{ $t('editSignature') }}</el-dropdown-item>
                     <el-dropdown-item v-if="item.accountId !== userStore.user.account.accountId" @click="setAsTop(item, index)">{{ $t('pin') }}</el-dropdown-item>
                     <el-dropdown-item v-if="item.accountId !== userStore.user.account.accountId && hasPerm('account:delete')"
                                       @click="remove(item)">{{ $t('delete') }}
@@ -123,6 +124,15 @@
         </el-button>
       </div>
     </el-dialog>
+    <el-dialog v-model="signatureShow" :title="$t('editSignature')">
+      <div class="container">
+        <el-input v-model="signatureText" type="textarea" :rows="5" :placeholder="$t('signaturePlaceholder')" autocomplete="off">
+        </el-input>
+        <el-button class="btn" type="primary" @click="saveSignature" :loading="signatureLoading"
+        >{{ $t('save') }}
+        </el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 <script setup>
@@ -133,6 +143,7 @@ import {
   accountAdd,
   accountDelete,
   accountSetName,
+  accountSetSignature,
   accountSetAllReceive,
   accountSetAsTop
 } from "@/request/account.js";
@@ -162,6 +173,35 @@ const verifyShow = ref(false)
 const setNameShow = ref(false)
 const setNameLoading = ref(false)
 const accountName = ref(null)
+const signatureShow = ref(false)
+const signatureLoading = ref(false)
+const signatureText = ref('')
+let signatureAccount = null
+
+function openSignature(accountItem) {
+  signatureAccount = accountItem
+  signatureText.value = accountItem.signature || ''
+  signatureShow.value = true
+}
+
+function saveSignature() {
+  if (signatureLoading.value || !signatureAccount) return
+  signatureLoading.value = true
+  accountSetSignature(signatureAccount.accountId, signatureText.value).then(() => {
+    signatureAccount.signature = signatureText.value
+    if (accountStore.currentAccountId === signatureAccount.accountId) {
+      accountStore.currentAccount.signature = signatureText.value
+    }
+    signatureShow.value = false
+    ElMessage({
+      message: t('signatureSaved'),
+      type: 'success',
+      plain: true,
+    })
+  }).finally(() => {
+    signatureLoading.value = false
+  })
+}
 const addRef = ref({})
 const scrollbarRef = ref({})
 let account = null

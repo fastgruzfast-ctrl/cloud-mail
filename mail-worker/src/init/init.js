@@ -32,8 +32,20 @@ const dbInit = {
 		await this.v3_1DB(c);
 		await this.v3_2DB(c);
 		await this.v3_3DB(c);
+		await this.v3_4DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_4DB(c) {
+		// 已有部署补充 account.signature 字段（新库已在 intDB 建表时包含）
+		try {
+			await c.env.db.batch([
+				c.env.db.prepare(`ALTER TABLE account ADD COLUMN signature TEXT NOT NULL DEFAULT '';`),
+			]);
+		} catch (e) {
+			console.warn(`跳过字段：${e.message}`);
+		}
 	},
 
 	async v3_3DB(c) {
@@ -665,7 +677,89 @@ const dbInit = {
 			latest_email_time DATETIME,
 			create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
 			user_id INTEGER NOT NULL,
-			is_del INTEGER DEFAULT 0 NOT NULL
+			is_del INTEGER DEFAULT 0 NOT NULL,
+			signature TEXT NOT NULL DEFAULT ''
+		  )
+		`).run();
+
+		await c.env.db.prepare(`
+		  CREATE TABLE IF NOT EXISTS mail_rule (
+			rule_id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			name TEXT NOT NULL DEFAULT '',
+			field TEXT NOT NULL DEFAULT 'sender',
+			op TEXT NOT NULL DEFAULT 'contains',
+			value TEXT NOT NULL DEFAULT '',
+			actions TEXT NOT NULL DEFAULT '[]',
+			enabled INTEGER NOT NULL DEFAULT 1,
+			create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+		  )
+		`).run();
+
+		await c.env.db.prepare(`
+		  CREATE TABLE IF NOT EXISTS scheduled_email (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			account_id INTEGER NOT NULL,
+			to_email TEXT NOT NULL DEFAULT '',
+			subject TEXT NOT NULL DEFAULT '',
+			content TEXT NOT NULL DEFAULT '',
+			send_at DATETIME NOT NULL,
+			status TEXT NOT NULL DEFAULT 'pending',
+			create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+		  )
+		`).run();
+
+		await c.env.db.prepare(`
+		  CREATE TABLE IF NOT EXISTS mail_template (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			name TEXT NOT NULL DEFAULT '',
+			subject TEXT NOT NULL DEFAULT '',
+			content TEXT NOT NULL DEFAULT '',
+			create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+		  )
+		`).run();
+
+		await c.env.db.prepare(`
+		  CREATE TABLE IF NOT EXISTS auto_reply (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			enabled INTEGER NOT NULL DEFAULT 0,
+			subject TEXT NOT NULL DEFAULT '',
+			content TEXT NOT NULL DEFAULT '',
+			start_time DATETIME,
+			end_time DATETIME,
+			create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+		  )
+		`).run();
+
+		await c.env.db.prepare(`
+		  CREATE TABLE IF NOT EXISTS mail_tag (
+			tag_id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			name TEXT NOT NULL DEFAULT '',
+			color TEXT NOT NULL DEFAULT '#409eff',
+			create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+		  )
+		`).run();
+
+		await c.env.db.prepare(`
+		  CREATE TABLE IF NOT EXISTS email_tag (
+			email_id INTEGER NOT NULL,
+			tag_id INTEGER NOT NULL,
+			PRIMARY KEY (email_id, tag_id)
+		  )
+		`).run();
+
+		await c.env.db.prepare(`
+		  CREATE TABLE IF NOT EXISTS contact (
+			contact_id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			name TEXT NOT NULL DEFAULT '',
+			email TEXT NOT NULL DEFAULT '',
+			remark TEXT NOT NULL DEFAULT '',
+			create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
 		  )
 		`).run();
 

@@ -23,6 +23,11 @@ app.put('/account/setName', async (c) => {
 	return c.json(result.ok());
 });
 
+app.put('/account/setSignature', async (c) => {
+	await accountService.setSignature(c, await c.req.json(), userContext.getUserId(c));
+	return c.json(result.ok());
+});
+
 app.put('/account/setAllReceive', async (c) => {
 	await accountService.setAllReceive(c, await c.req.json(), userContext.getUserId(c));
 	return c.json(result.ok());

@@ -62,6 +62,17 @@
             </div>
           </div>
           <div>
+            <el-dropdown @command="insertTemplateCmd" trigger="click" style="margin-right: 8px">
+              <el-button>{{ $t('insertTemplate') }}</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item v-for="tpl in templates" :key="tpl.id" :command="tpl">{{ tpl.name }}</el-dropdown-item>
+                  <el-dropdown-item v-if="templates.length === 0" disabled>{{ $t('noTemplates') }}</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <el-button @click="templateManageShow = true" style="margin-right: 8px">{{ $t('manageTemplates') }}</el-button>
+            <el-button @click="openSchedule" style="margin-right: 8px">{{ $t('scheduledSend') }}</el-button>
             <el-button type="primary" @click="sendEmail" v-if="form.sendType === 'reply'">{{ $t('reply') }}</el-button>
             <el-button type="primary" @click="sendEmail" v-else-if="form.sendType === 'forward'">{{ $t('forward') }}</el-button>
             <el-button type="primary" @click="sendEmail" v-else>{{ $t('send') }}</el-button>
@@ -90,6 +101,40 @@
         <el-button type="primary" @click="chooseContact">{{t('selectContacts')}}</el-button>
       </div>
     </el-dialog>
+    <el-dialog v-model="templateManageShow" :title="t('manageTemplates')" top="10vh" width="520">
+      <div class="template-manage">
+        <div class="template-list">
+          <div class="template-row" v-for="tpl in templates" :key="tpl.id">
+            <span class="template-name">{{ tpl.name }}</span>
+            <span>
+              <el-button link type="primary" @click="editTemplate(tpl)">{{ t('edit') }}</el-button>
+              <el-button link type="danger" @click="delTemplate(tpl)">{{ t('delete') }}</el-button>
+            </span>
+          </div>
+          <el-empty v-if="templates.length === 0" :description="t('noTemplates')" :image-size="80"/>
+        </div>
+        <div class="template-form">
+          <el-input v-model="templateForm.name" :placeholder="t('templateNamePlaceholder')"/>
+          <el-input v-model="templateForm.subject" :placeholder="t('subject')"/>
+          <el-input v-model="templateForm.content" type="textarea" :rows="4" :placeholder="t('bodyContent')"/>
+          <el-button type="primary" @click="saveTemplate">{{ t('save') }}</el-button>
+        </div>
+      </div>
+    </el-dialog>
+    <el-dialog v-model="scheduleShow" :title="t('scheduledSend')" width="360">
+      <div class="schedule-box">
+        <el-date-picker
+            v-model="scheduleTime"
+            type="datetime"
+            :placeholder="t('pickSendTime')"
+            :disabled-date="(d) => d.getTime() < Date.now() - 86400000"
+            style="width: 100%"
+        />
+        <div class="schedule-btn">
+          <el-button type="primary" :loading="scheduleLoading" @click="confirmSchedule">{{ t('confirm') }}</el-button>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 <script setup>
@@ -98,6 +143,9 @@ import {h, nextTick, onMounted, onUnmounted, reactive, ref, toRaw, computed} fro
 import {Icon} from "@iconify/vue";
 import {useUserStore} from "@/store/user.js";
 import {emailSend} from "@/request/email.js";
+import {templateList, templateAdd, templateUpdate, templateDelete} from "@/request/template.js";
+import {scheduleAdd} from "@/request/schedule.js";
+import {contactSearch} from "@/request/contact.js";
 import {isEmail} from "@/utils/verify-utils.js";
 import {useAccountStore} from "@/store/account.js";
 import {useEmailStore} from "@/store/email.js";
@@ -161,6 +209,13 @@ const form = reactive({
 
 const selectRecipientList = ref([])
 
+const templates = ref([])
+const templateManageShow = ref(false)
+const templateForm = reactive({id: null, name: '', subject: '', content: ''})
+const scheduleShow = ref(false)
+const scheduleTime = ref(null)
+const scheduleLoading = ref(false)
+
 const contacts = computed(() => writerStore.sendRecipientRecord.map(item => ({email: item})))
 
 function openContacts() {
@@ -222,6 +277,19 @@ function inputChange(value) {
 
   selectRecipientList.value = writerStore.sendRecipientRecord.filter(item => value && !form.receiveEmail.includes(item) && item.startsWith(value)).slice(0, 10);
 
+  if (value && value.length >= 1) {
+    contactSearch(value).then(list => {
+      const extra = (list || [])
+          .map(item => item.email)
+          .filter(email => email && !form.receiveEmail.includes(email) && !selectRecipientList.value.includes(email))
+          .slice(0, 10 - selectRecipientList.value.length);
+      if (extra.length > 0) {
+        selectRecipientList.value = [...selectRecipientList.value, ...extra];
+        if (!selectStatus) openSelect()
+      }
+    }).catch(() => {})
+  }
+
   if (!selectStatus && selectRecipientList.value.length > 0) {
     openSelect()
   }
@@ -230,6 +298,118 @@ function inputChange(value) {
     openSelect()
   }
 
+}
+
+// ---------- 邮件模板 ----------
+function loadTemplates() {
+  templateList().then(list => {
+    templates.value = list || []
+  }).catch(() => {})
+}
+
+function insertTemplateCmd(tpl) {
+  if (tpl.subject) form.subject = tpl.subject
+  if (tpl.content) {
+    defValue.value = ''
+    nextTick(() => {
+      defValue.value = tpl.content
+    })
+  }
+}
+
+function editTemplate(tpl) {
+  templateForm.id = tpl.id
+  templateForm.name = tpl.name
+  templateForm.subject = tpl.subject
+  templateForm.content = tpl.content
+}
+
+function delTemplate(tpl) {
+  ElMessageBox.confirm(t('confirm'), {
+    confirmButtonText: t('confirm'),
+    cancelButtonText: t('cancel'),
+    type: 'warning'
+  }).then(() => {
+    templateDelete(tpl.id).then(() => {
+      loadTemplates()
+      if (templateForm.id === tpl.id) resetTemplateForm()
+    })
+  })
+}
+
+function resetTemplateForm() {
+  templateForm.id = null
+  templateForm.name = ''
+  templateForm.subject = ''
+  templateForm.content = ''
+}
+
+function saveTemplate() {
+  if (!templateForm.name) {
+    ElMessage({message: t('templateNamePlaceholder'), type: 'error', plain: true})
+    return
+  }
+  const data = {name: templateForm.name, subject: templateForm.subject, content: templateForm.content}
+  const p = templateForm.id ? templateUpdate({id: templateForm.id, ...data}) : templateAdd(data)
+  p.then(() => {
+    resetTemplateForm()
+    loadTemplates()
+    ElMessage({message: t('saveSuccessMsg'), type: 'success', plain: true})
+  })
+}
+
+// ---------- 定时发送 ----------
+function openSchedule() {
+  if (form.receiveEmail.length === 0) {
+    ElMessage({message: t('emptyRecipientMsg'), type: 'error', plain: true})
+    return
+  }
+  if (!form.content) {
+    form.content = editor.value.getContent();
+  }
+  if (!form.content) {
+    ElMessage({message: t('emptyContentMsg'), type: 'error', plain: true})
+    return
+  }
+  scheduleTime.value = null
+  scheduleShow.value = true
+}
+
+function confirmSchedule() {
+  if (!scheduleTime.value) {
+    ElMessage({message: t('scheduleTimeRequired'), type: 'error', plain: true})
+    return
+  }
+  const sendAt = dayjs(scheduleTime.value).format('YYYY-MM-DD HH:mm:ss')
+  if (dayjs(scheduleTime.value).isBefore(dayjs())) {
+    ElMessage({message: t('scheduleTimeFuture'), type: 'error', plain: true})
+    return
+  }
+  if (scheduleLoading.value) return
+  scheduleLoading.value = true
+  scheduleAdd({
+    accountId: form.accountId,
+    toEmail: [...form.receiveEmail],
+    subject: form.subject,
+    content: appendSignature(form.content),
+    sendAt
+  }).then(() => {
+    scheduleShow.value = false
+    show.value = false
+    resetForm()
+    ElMessage({message: t('scheduleSaved'), type: 'success', plain: true})
+  }).finally(() => {
+    scheduleLoading.value = false
+  })
+}
+
+// ---------- 签名 ----------
+function appendSignature(content) {
+  const signature = accountStore.currentAccount?.signature || ''
+  if (!signature) return content
+  const sigHtml = '<br><br>-- <br>' + signature.replace(/\n/g, '<br>')
+  if ((content || '').endsWith(sigHtml)) return content
+  return content + sigHtml
 }
 
 function addTagChange(val) {
@@ -350,6 +530,8 @@ async function sendEmail() {
   sending = true
 
   show.value = false
+
+  form.content = appendSignature(form.content)
 
   emailSend(form, (e) => {
     percent.value = Math.round((e.loaded * 98) / e.total)
@@ -516,6 +698,7 @@ function open() {
     form.accountId = accountStore.currentAccount.accountId;
     form.name = accountStore.currentAccount.name;
   }
+  loadTemplates()
   show.value = true;
   editor.value.focus()
 }
@@ -763,6 +946,52 @@ function close() {
   display: flex;
   justify-content: end;
   margin-top: 10px;
+}
+
+.template-manage {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+
+  .template-list {
+    max-height: 220px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    .template-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 10px;
+      background: var(--light-ill);
+      border-radius: 4px;
+
+      .template-name {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+    }
+  }
+
+  .template-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+.schedule-box {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+
+  .schedule-btn {
+    display: flex;
+    justify-content: end;
+  }
 }
 
 .add-contact {

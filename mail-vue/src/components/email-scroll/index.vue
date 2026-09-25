@@ -18,6 +18,9 @@
         <Icon v-perm="'email:delete'" class="icon delete" icon="fluent:mail-read-20-regular" width="21" height="21"
               v-if="getSelectedMailsIds().length > 0 && showUnread"
               @click="handleRead"/>
+        <Icon class="icon" icon="fluent:tag-20-regular" width="19" height="19"
+              v-if="getSelectedMailsIds().length > 0"
+              @click="openTagDialog" :title="t('assignTag')"/>
       </div>
 
       <div class="header-right">
@@ -90,6 +93,9 @@
                           <template v-else>{{ item.subject || '\u200B' }}</template>
                         </slot>
                       </span>
+                    </span>
+                    <span class="tag-dots" v-if="item.tagList && item.tagList.length" @click.stop>
+                      <span v-for="tag in item.tagList" :key="tag.tagId" class="tag-dot" :style="'background:' + tag.color" :title="tag.name"></span>
                     </span>
                     <span class="email-content" v-if="props.highlightKeyword" v-html="highlightHtml(contentSnippet(item), props.highlightKeyword)"></span>
                     <span class="email-content" v-else>{{ item.listText || item.text || '\u200B' }}</span>
@@ -233,6 +239,19 @@
         </el-dropdown-menu>
       </template>
     </el-dropdown>
+    <el-dialog v-model="tagDialogShow" :title="t('assignTag')" width="320" append-to-body>
+      <div class="tag-dialog">
+        <el-select v-model="selectedTagId" :placeholder="t('selectTagFirst')" style="width: 100%">
+          <el-option v-for="tag in allTags" :key="tag.tagId" :label="tag.name" :value="tag.tagId">
+            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px" :style="'background:' + tag.color"></span>
+            <span>{{ tag.name }}</span>
+          </el-option>
+        </el-select>
+        <div class="tag-dialog-btn">
+          <el-button type="primary" @click="confirmAssignTag">{{ t('confirm') }}</el-button>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -249,6 +268,7 @@ import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
 import { UseVirtualList } from '@vueuse/components'
 import { useScroll } from '@vueuse/core'
+import {tagList, tagAssign, tagEmailTags} from "@/request/tag.js";
 
 const props = defineProps({
   getEmailList: Function,
@@ -856,6 +876,7 @@ function getEmailList(refresh = false) {
 
     handleList(list);
     emailList.push(...list);
+    loadItemTags(list);
     if (refresh) scrollbarRef.value?.setScrollTop(0);
 
     noLoading.value = data.list.length < queryParam.size;
@@ -913,6 +934,7 @@ function contentSnippet(item) {
 
 function handleList(list) {
   list.forEach(email => {
+    email.tagList = email.tagList || [];
     email.formatCreateTime = fromNow(email.createTime);    email.test = t('received')
     const statusIconMap = {
       0: { icon: 'ic:round-mark-email-read', color: '#51C76B', content: t('received') },
@@ -944,6 +966,53 @@ function refreshList() {
   checkAll.value = false;
   isIndeterminate.value = false;
   getEmailList(true);
+}
+
+// ---------- 标签 ----------
+const tagDialogShow = ref(false)
+const allTags = ref([])
+const selectedTagId = ref(null)
+
+function loadItemTags(list) {
+  const ids = (list || []).map(item => item.emailId).filter(Boolean)
+  if (ids.length === 0) return
+  tagEmailTags(ids.join(',')).then(map => {
+    list.forEach(item => {
+      item.tagList = (map && map[item.emailId]) || []
+    })
+  }).catch(() => {})
+}
+
+function openTagDialog() {
+  selectedTagId.value = null
+  tagList().then(list => {
+    allTags.value = list || []
+    tagDialogShow.value = true
+  }).catch(() => {
+    tagDialogShow.value = true
+  })
+}
+
+function confirmAssignTag() {
+  if (!selectedTagId.value) {
+    ElMessage({message: t('selectTagFirst'), type: 'warning', plain: true})
+    return
+  }
+  const emailIds = getSelectedMailsIds()
+  tagAssign(emailIds.join(','), selectedTagId.value).then(() => {
+    const tag = allTags.value.find(item => item.tagId === selectedTagId.value)
+    emailList.forEach(item => {
+      if (emailIds.includes(item.emailId)) {
+        item.tagList = item.tagList || []
+        if (!item.tagList.some(x => x.tagId === tag.tagId)) {
+          item.tagList.push({tagId: tag.tagId, name: tag.name, color: tag.color})
+        }
+        item.checked = false
+      }
+    })
+    tagDialogShow.value = false
+    ElMessage({message: t('setSuccess'), type: 'success', plain: true})
+  })
 }
 
 function loadData() {
@@ -1413,6 +1482,31 @@ ul {
   list-style: none;
   padding: 0;
   margin: 0;
+}
+
+.tag-dots {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+
+  .tag-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+}
+
+.tag-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+
+  .tag-dialog-btn {
+    display: flex;
+    justify-content: end;
+  }
 }
 
 </style>

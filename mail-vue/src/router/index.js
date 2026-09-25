@@ -51,6 +51,46 @@ const routes = [
                     menu: true
                 }
             },
+            {
+                path: '/mail-rules',
+                name: 'rules',
+                component: () => import('@/views/rules/index.vue'),
+                meta: {
+                    title: 'mailRules',
+                    name: 'rules',
+                    menu: true
+                }
+            },
+            {
+                path: '/mail-tags',
+                name: 'tags',
+                component: () => import('@/views/tags/index.vue'),
+                meta: {
+                    title: 'mailTags',
+                    name: 'tags',
+                    menu: true
+                }
+            },
+            {
+                path: '/contacts',
+                name: 'contacts',
+                component: () => import('@/views/contacts/index.vue'),
+                meta: {
+                    title: 'contacts',
+                    name: 'contacts',
+                    menu: true
+                }
+            },
+            {
+                path: '/scheduled',
+                name: 'scheduled',
+                component: () => import('@/views/scheduled/index.vue'),
+                meta: {
+                    title: 'scheduledMails',
+                    name: 'scheduled',
+                    menu: true
+                }
+            },
         ]
 
     },

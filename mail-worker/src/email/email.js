@@ -12,6 +12,8 @@ import userService from '../service/user-service';
 import telegramService from '../service/telegram-service';
 import aiService from '../service/ai-service';
 import webhookService from '../service/webhook-service';
+import ruleService from '../service/rule-service';
+import autoreplyService from '../service/autoreply-service';
 
 export async function email(message, env, ctx) {
 
@@ -158,6 +160,12 @@ export async function email(message, env, ctx) {
 
 		emailRow = await emailService.completeReceive({ env }, account ? emailConst.status.RECEIVE : emailConst.status.NOONE, emailRow.emailId);
 
+
+		//用户邮件规则
+		await ruleService.applyRules({ env }, emailRow);
+
+		//自动回复
+		await autoreplyService.maybeSend({ env }, emailRow);
 
 		if (ruleType === settingConst.ruleType.RULE) {
 

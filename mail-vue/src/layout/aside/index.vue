@@ -26,6 +26,26 @@
           <Icon icon="solar:star-line-duotone" width="20" height="20" />
           <span class="menu-name" style="margin-left: 16px">{{$t('starred')}}</span>
         </el-menu-item>
+        <el-menu-item @click="router.push({name: 'rules'})" index="rules"
+                      :class="route.meta.name === 'rules' ? 'choose-item' : ''">
+          <Icon icon="fluent:filter-20-regular" width="20" height="20" />
+          <span class="menu-name" style="margin-left: 16px">{{$t('mailRules')}}</span>
+        </el-menu-item>
+        <el-menu-item @click="router.push({name: 'tags'})" index="tags"
+                      :class="route.meta.name === 'tags' ? 'choose-item' : ''">
+          <Icon icon="fluent:tag-20-regular" width="20" height="20" />
+          <span class="menu-name" style="margin-left: 16px">{{$t('mailTags')}}</span>
+        </el-menu-item>
+        <el-menu-item @click="router.push({name: 'contacts'})" index="contacts"
+                      :class="route.meta.name === 'contacts' ? 'choose-item' : ''">
+          <Icon icon="fluent:contact-card-20-regular" width="20" height="20" />
+          <span class="menu-name" style="margin-left: 16px">{{$t('contacts')}}</span>
+        </el-menu-item>
+        <el-menu-item @click="router.push({name: 'scheduled'})" index="scheduled"
+                      :class="route.meta.name === 'scheduled' ? 'choose-item' : ''">
+          <Icon icon="fluent:timer-20-regular" width="20" height="20" />
+          <span class="menu-name" style="margin-left: 16px">{{$t('scheduledMails')}}</span>
+        </el-menu-item>
         <el-menu-item @click="router.push({name: 'setting'})" index="setting"
                       :class="route.meta.name === 'setting' ? 'choose-item' : ''">
           <Icon icon="fluent:settings-48-regular" width="20" height="20" />

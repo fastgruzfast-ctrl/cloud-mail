@@ -53,7 +53,12 @@
           <el-option key="4" :label="$t('selectDeleted')" value="delete"/>
           <el-option key="4" :label="$t('noRecipientTitle')" value="noone"/>
         </el-select>
+        <el-select v-model="params.tagId" :placeholder="$t('filterByTag')" class="status-select" clearable @change="typeSelectChange" @visible-change="loadTags">
+          <el-option :label="$t('allTags')" :value="null"/>
+          <el-option v-for="tag in tagOptions" :key="tag.tagId" :label="tag.name" :value="tag.tagId"/>
+        </el-select>
         <Icon class="icon" icon="iconoir:search" @click="search" width="20" height="20"/>
+        <Icon class="icon" icon="tabler:download" @click="exportSelected" width="20" height="20" :title="$t('exportEmails')"/>
         <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-down-outline"
               v-if="params.timeSort === 0" width="28" height="28"/>
         <Icon class="icon" @click="changeTimeSort" icon="material-symbols-light:timer-arrow-up-outline" v-else
@@ -105,8 +110,11 @@ import router from "@/router/index.js";
 import {useI18n} from 'vue-i18n';
 import {toUtc} from "@/utils/day.js";
 import {sleep} from "@/utils/time-utils.js";
+import {notifyNewMail} from "@/utils/notify.js";
 import {useSettingStore} from "@/store/setting.js";
 import { useRoute } from 'vue-router'
+import {tagList} from "@/request/tag.js";
+import JSZip from "jszip";
 
 defineOptions({
   name: 'all-email'
@@ -140,6 +148,7 @@ const params = reactive({
   name: null,
   subject: null,
   content: null,
+  tagId: null,
   searchType: 'name'
 })
 
@@ -257,6 +266,7 @@ function refreshBefore() {
   params.name = null
   params.subject = null
   params.content = null
+  params.tagId = null
   params.searchType = 'name'
 }
 
@@ -315,6 +325,69 @@ function getEmailList(emailId, size) {
   return emailStore.fetchList(full => allEmailList({emailId, size, full, ...params}))
 }
 
+const tagOptions = ref([])
+
+function loadTags(visible) {
+  if (!visible) return
+  tagList().then(list => {
+    tagOptions.value = list || []
+  }).catch(() => {})
+}
+
+function buildEml(email) {
+  const full = emailStore.toContentEmail(email) || email
+  const from = full.name ? `${full.name} <${full.sendEmail}>` : (full.sendEmail || '')
+  const to = full.toEmail || ''
+  const subject = (full.subject || '').replace(/[\r\n]+/g, ' ')
+  const date = full.createTime ? new Date(full.createTime.replace(' ', 'T') + 'Z').toUTCString() : new Date().toUTCString()
+  const isHtml = !!(full.content && /<\w+/.test(full.content))
+  const body = isHtml ? full.content : (full.text || '')
+  const contentType = isHtml ? 'text/html' : 'text/plain'
+  return [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    `Date: ${date}`,
+    'MIME-Version: 1.0',
+    `Content-Type: ${contentType}; charset=utf-8`,
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    body || ''
+  ].join('\r\n')
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(url), 5000)
+}
+
+async function exportSelected() {
+  const selected = (sysEmailScroll.value.emailList || []).filter(item => item.checked)
+  if (selected.length === 0) {
+    ElMessage({message: t('exportEmpty'), type: 'warning', plain: true})
+    return
+  }
+  try {
+    const zip = new JSZip()
+    selected.forEach((item, index) => {
+      const safe = (item.subject || 'no-subject').replace(/[\\/:*?"<>|]/g, '_').slice(0, 60) || 'email'
+      zip.file(`${safe}-${item.emailId}.eml`, buildEml(item))
+    })
+    const blob = await zip.generateAsync({type: 'blob'})
+    downloadBlob(blob, `emails-${Date.now()}.zip`)
+    ElMessage({message: t('exportSuccess'), type: 'success', plain: true})
+  } catch (e) {
+    console.error(e)
+    ElMessage({message: e.message || 'export failed', type: 'error', plain: true})
+  }
+}
+
 async function latest() {
 
   while (true) {
@@ -365,6 +438,7 @@ async function latest() {
       for (let email of list) {
 
         sysEmailScroll.value.addItem(email)
+        notifyNewMail(email)
         await sleep(50)
 
       }

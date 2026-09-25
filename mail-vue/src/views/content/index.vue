@@ -9,6 +9,8 @@
       </span>
       <Icon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openReply" icon="la:reply" width="21" height="21" />
       <Icon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openForward" icon="iconoir:arrow-up-right" width="20" height="20" />
+      <Icon class="icon" @click="showSummary" icon="hugeicons:ai-brain-04" width="20" height="20" :title="$t('aiSummary')"/>
+      <Icon class="icon" @click="translateShow = true" icon="hugeicons:translate" width="20" height="20" :title="$t('aiTranslate')"/>
     </div>
     <div></div>
     <el-scrollbar class="scrollbar">
@@ -55,6 +57,8 @@
                 <div class="att-size">{{ formatBytes(att.size) }}</div>
                 <div class="opt-icon att-icon">
                   <Icon v-if="isImage(att.filename)" icon="hugeicons:view" width="22" height="22" @click="showImage(att.key)"/>
+                  <Icon v-else-if="isPreviewable(att.filename)" icon="hugeicons:view" width="22" height="22" @click="previewAtt(att)"/>
+                  <Icon v-else-if="isOffice(att.filename)" icon="hugeicons:view" width="22" height="22" @click="previewOffice(att)" :title="$t('onlinePreview')"/>
                   <a :href="cvtR2Url(att.key)" download>
                     <Icon icon="system-uicons:push-down" width="22" height="22"/>
                   </a>
@@ -71,6 +75,27 @@
         show-progress
         @close="showPreview = false"
     />
+    <el-dialog v-model="summaryShow" :title="$t('aiSummary')" width="520" top="15vh">
+      <div v-loading="summaryLoading" class="ai-result">
+        <pre v-if="summaryText">{{ summaryText }}</pre>
+        <el-empty v-else-if="!summaryLoading" :description="$t('aiEmpty')" :image-size="80"/>
+      </div>
+    </el-dialog>
+    <el-dialog v-model="translateShow" :title="$t('aiTranslate')" width="520" top="15vh" @closed="translateText = ''">
+      <div class="ai-result">
+        <div class="translate-bar">
+          <el-select v-model="translateLang" size="small" style="width: 110px" @change="doTranslate">
+            <el-option label="中文" value="zh"/>
+            <el-option label="English" value="en"/>
+          </el-select>
+          <el-button size="small" type="primary" :loading="translateLoading" @click="doTranslate">{{ $t('aiTranslate') }}</el-button>
+        </div>
+        <div v-loading="translateLoading">
+          <pre v-if="translateText">{{ translateText }}</pre>
+          <el-empty v-else-if="!translateLoading" :description="$t('aiEmpty')" :image-size="80"/>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 <script setup>
@@ -89,6 +114,7 @@ import {cvtR2Url,toOssDomain} from "@/utils/convert.js";
 import {getIconByName} from "@/utils/icon-utils.js";
 import {useSettingStore} from "@/store/setting.js";
 import {allEmailDelete} from "@/request/all-email.js";
+import {aiSummary, aiTranslate} from "@/request/ai.js";
 import {useUiStore} from "@/store/ui.js";
 import {useI18n} from "vue-i18n";
 import {EmailUnreadEnum} from "@/enums/email-enum.js";
@@ -107,6 +133,13 @@ const email = computed(() => emailStore.contentData.email || {
 })
 const showPreview = ref(false)
 const srcList = reactive([])
+const summaryShow = ref(false)
+const summaryLoading = ref(false)
+const summaryText = ref('')
+const translateShow = ref(false)
+const translateLoading = ref(false)
+const translateText = ref('')
+const translateLang = ref('zh')
 
 const { t } = useI18n()
 watch(() => accountStore.currentAccountId, () => {
@@ -196,6 +229,44 @@ function showImage(key) {
 
 function isImage(filename) {
   return ['png', 'jpg', 'jpeg', 'bmp', 'gif','jfif'].includes(getExtName(filename))
+}
+
+function isPreviewable(filename) {
+  return ['pdf', 'txt'].includes(getExtName(filename))
+}
+
+function isOffice(filename) {
+  return ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(getExtName(filename))
+}
+
+function previewAtt(att) {
+  window.open(cvtR2Url(att.key), '_blank')
+}
+
+function previewOffice(att) {
+  const url = cvtR2Url(att.key)
+  window.open('https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(url), '_blank')
+}
+
+function showSummary() {
+  summaryShow.value = true
+  summaryText.value = ''
+  summaryLoading.value = true
+  aiSummary(email.value.emailId).then(text => {
+    summaryText.value = text || ''
+  }).finally(() => {
+    summaryLoading.value = false
+  })
+}
+
+function doTranslate() {
+  translateLoading.value = true
+  translateText.value = ''
+  aiTranslate(email.value.emailId, translateLang.value).then(text => {
+    translateText.value = text || ''
+  }).finally(() => {
+    translateLoading.value = false
+  })
 }
 
 function formateReceive(recipient) {
@@ -473,6 +544,27 @@ const handleDelete = () => {
 
 .bottom-distance {
   margin-bottom: 30px;
+}
+
+.ai-result {
+  min-height: 120px;
+  max-height: 60vh;
+  overflow-y: auto;
+
+  pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: inherit;
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .translate-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
 }
 
 

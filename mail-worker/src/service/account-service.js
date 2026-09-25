@@ -231,6 +231,11 @@ const accountService = {
 		await orm(c).update(account).set({name}).where(and(eq(account.userId, userId),eq(account.accountId, accountId))).run();
 	},
 
+	async setSignature(c, params, userId) {
+		const { signature, accountId } = params
+		await orm(c).update(account).set({signature: signature || ''}).where(and(eq(account.userId, userId),eq(account.accountId, accountId))).run();
+	},
+
 	async allAccount(c, params) {
 
 		let { userId, num, size } = params

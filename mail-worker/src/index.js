@@ -6,6 +6,7 @@ import emailService from './service/email-service';
 import kvObjService from './service/kv-obj-service';
 import oauthService from './service/oauth-service';
 import analysisService from './service/analysis-service';
+import scheduleService from './service/schedule-service';
 export default {
 	 async fetch(req, env, ctx) {
 
@@ -27,6 +28,11 @@ export default {
 	async scheduled(c, env, ctx) {
 		if (c.cron === '*/30 * * * *') {
 			await analysisService.refreshEchartsCache({ env })
+			return;
+		}
+
+		if (c.cron === '*/5 * * * *') {
+			await scheduleService.processDue({ env })
 			return;
 		}
 
