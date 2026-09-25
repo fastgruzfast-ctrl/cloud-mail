@@ -424,6 +424,7 @@ const en = {
     addTag: 'Add Tag',
     editTag: 'Edit Tag',
     tagName: 'Tag Name',
+    emptyTagNameMsg: 'Tag name cannot be empty',
     tagColor: 'Tag Color',
     assignTag: 'Assign Tag',
     unassignTag: 'Remove Tag',

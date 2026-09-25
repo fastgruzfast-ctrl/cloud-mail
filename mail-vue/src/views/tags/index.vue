@@ -47,7 +47,6 @@
 import {defineOptions, reactive, ref} from "vue"
 import {Icon} from "@iconify/vue";
 import loading from "@/components/loading/index.vue";
-import {useSettingStore} from "@/store/setting.js";
 import {tagAdd, tagDelete, tagList, tagUpdate} from "@/request/tag.js";
 import {useI18n} from "vue-i18n";
 
@@ -56,7 +55,6 @@ defineOptions({
 })
 
 const {t} = useI18n()
-const settingStore = useSettingStore()
 const tagLoading = ref(true)
 const tagFirst = ref(true)
 const showForm = ref(false)
@@ -116,7 +114,7 @@ function submit() {
 
   if (!form.name || !form.name.trim()) {
     ElMessage({
-      message: settingStore.lang === 'en' ? t('tagName') + ' cannot be empty' : t('tagName') + '不能为空',
+      message: t('emptyTagNameMsg'),
       type: "error",
       plain: true
     })

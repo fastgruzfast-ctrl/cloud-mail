@@ -424,6 +424,7 @@ const zh = {
     addTag: '新增标签',
     editTag: '编辑标签',
     tagName: '标签名称',
+    emptyTagNameMsg: '标签名称不能为空',
     tagColor: '标签颜色',
     assignTag: '打标签',
     unassignTag: '移除标签',
