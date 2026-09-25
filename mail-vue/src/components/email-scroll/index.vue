@@ -86,11 +86,13 @@
                       <span v-if="item.code" class="code-tag" @click.stop="copyCode(item.code)">[{{ t('codeLabel') }}{{ item.code }}]</span>
                       <span class="subject-text">
                         <slot name="subject" :email="item" >
-                          {{ item.subject || '\u200B' }}
+                          <span v-if="props.highlightKeyword" v-html="highlightHtml(item.subject || '', props.highlightKeyword)"></span>
+                          <template v-else>{{ item.subject || '\u200B' }}</template>
                         </slot>
                       </span>
                     </span>
-                    <span class="email-content">{{ item.listText || item.text || '\u200B' }}</span>
+                    <span class="email-content" v-if="props.highlightKeyword" v-html="highlightHtml(contentSnippet(item), props.highlightKeyword)"></span>
+                    <span class="email-content" v-else>{{ item.listText || item.text || '\u200B' }}</span>
                   </div>
                   <div class="user-info" v-if="showUserInfo">
                     <div class="user">
@@ -295,6 +297,14 @@ const props = defineProps({
   showUnread: {
     type: Boolean,
     default: false
+  },
+  highlightKeyword: {
+    type: String,
+    default: ''
+  },
+  highlightMode: {
+    type: String,
+    default: ''
   }
 })
 
@@ -858,10 +868,52 @@ function getEmailList(refresh = false) {
   })
 }
 
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function stripHtml(html) {
+  return String(html ?? '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** 把关键词标黄（先转义再替换，防止 HTML 注入） */
+function highlightHtml(text, keyword) {
+  const safe = escapeHtml(text);
+  const kw = String(keyword ?? '').trim();
+  if (!kw) return safe;
+  const escapedKw = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return safe.replace(new RegExp(escapedKw, 'gi'), '<mark class="search-hl">$&</mark>');
+}
+
+/** 正文搜索时，截取关键词附近的片段，方便一眼看到命中位置 */
+function contentSnippet(item) {
+  const raw = item.text || stripHtml(item.content || '');
+  if (props.highlightMode !== 'content') {
+    return item.listText || item.text || '';
+  }
+  const kw = String(props.highlightKeyword ?? '').trim().toLowerCase();
+  const idx = raw.toLowerCase().indexOf(kw);
+  if (!kw || idx === -1) {
+    return item.listText || item.text || '';
+  }
+  const start = Math.max(0, idx - 40);
+  const end = Math.min(raw.length, idx + kw.length + 80);
+  return (start > 0 ? '…' : '') + raw.slice(start, end) + (end < raw.length ? '…' : '');
+}
+
 function handleList(list) {
   list.forEach(email => {
-    email.formatCreateTime = fromNow(email.createTime);
-    email.test = t('received')
+    email.formatCreateTime = fromNow(email.createTime);    email.test = t('received')
     const statusIconMap = {
       0: { icon: 'ic:round-mark-email-read', color: '#51C76B', content: t('received') },
       1: { icon: 'bi:send-arrow-up-fill',  color: '#51C76B', content: t('sent') },
@@ -1196,6 +1248,13 @@ function loadData() {
           padding-left: 0;
           margin-top: 0;
         }
+      }
+
+      .search-hl {
+        background-color: #ffeb3b;
+        color: inherit;
+        padding: 0 1px;
+        border-radius: 2px;
       }
     }
   }

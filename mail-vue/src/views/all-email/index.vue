@@ -16,7 +16,8 @@
                  @refresh-before="refreshBefore"
                  @right-search="rightSearch"
                  :type="'all-email'"
-
+                 :highlight-keyword="searchedKeyword"
+                 :highlight-mode="highlightMode"
     >
       <template #first>
         <el-input
@@ -34,6 +35,7 @@
               >
                 <el-option key="3" :label="$t('sender')" :value="'name'"/>
                 <el-option key="4" :label="$t('subject')" :value="'subject'"/>
+                <el-option key="5" :label="$t('bodyContent')" :value="'content'"/>
                 <el-option key="1" :label="$t('user')" :value="'user'"/>
                 <el-option key="2" :label="$t('selectEmail')" :value="'account'"/>
               </el-select>
@@ -117,6 +119,7 @@ const settingStore = useSettingStore();
 const clearTime = ref('')
 const sysEmailScroll = ref({})
 const searchValue = ref('')
+const searchedKeyword = ref('')
 const mySelect = ref()
 const showBathDelete = ref(false)
 const clearLoading = ref(false)
@@ -136,6 +139,7 @@ const params = reactive({
   accountEmail: null,
   name: null,
   subject: null,
+  content: null,
   searchType: 'name'
 })
 
@@ -170,6 +174,14 @@ const selectTitle = computed(() => {
   if (params.searchType === 'account') return t('selectEmail')
   if (params.searchType === 'name') return t('sender')
   if (params.searchType === 'subject') return t('subject')
+  if (params.searchType === 'content') return t('bodyContent')
+})
+
+const highlightMode = computed(() => {
+  if (!searchedKeyword.value) return ''
+  if (params.searchType === 'subject') return 'subject'
+  if (params.searchType === 'content') return 'content'
+  return ''
 })
 
 const paramsStar = localStorage.getItem('all-email-params')
@@ -237,12 +249,14 @@ function rightSearch(type, value) {
 
 function refreshBefore() {
   searchValue.value = null
+  searchedKeyword.value = ''
   params.timeSort = 0
   params.type = 'receive'
   params.userEmail = null
   params.accountEmail = null
   params.name = null
   params.subject = null
+  params.content = null
   params.searchType = 'name'
 }
 
@@ -252,6 +266,7 @@ function search() {
   params.accountEmail = null
   params.name = null
   params.subject = null
+  params.content = null
 
   if (params.searchType === 'user') {
     params.userEmail = searchValue.value
@@ -268,6 +283,12 @@ function search() {
   if (params.searchType === 'subject') {
     params.subject = searchValue.value
   }
+
+  if (params.searchType === 'content') {
+    params.content = searchValue.value
+  }
+
+  searchedKeyword.value = (searchValue.value || '').trim()
 
   sysEmailScroll.value.refreshList();
 }

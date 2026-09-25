@@ -171,7 +171,7 @@ const emailService = {
 		return conditions;
 	},
 
-	allEmailListFilters({ emailId, name, subject, accountEmail, userEmail, type, timeSort, withCursor = true }) {
+	allEmailListFilters({ emailId, name, subject, content, accountEmail, userEmail, type, timeSort, withCursor = true }) {
 		const conditions = [];
 
 		if (type === 'send') {
@@ -209,6 +209,15 @@ const emailService = {
 
 		if (subject) {
 			conditions.push(sql`${email.subject} COLLATE NOCASE LIKE ${subject + '%'}`);
+		}
+
+		if (content) {
+			conditions.push(
+				or(
+					sql`${email.text} COLLATE NOCASE LIKE ${'%' + content + '%'}`,
+					sql`${email.content} COLLATE NOCASE LIKE ${'%' + content + '%'}`,
+				)
+			);
 		}
 
 		if (withCursor && emailId) {
@@ -897,7 +906,7 @@ const emailService = {
 
 	async allList(c, params) {
 
-		let { emailId, size, name, subject, accountEmail, userEmail, type, timeSort, full } = params;
+		let { emailId, size, name, subject, content, accountEmail, userEmail, type, timeSort, full } = params;
 
 		size = Number(size);
 		emailId = Number(emailId) || 0;
@@ -922,8 +931,8 @@ const emailService = {
 
 		full = full === 1;
 
-		const filters = this.allEmailListFilters({ emailId, name, subject, accountEmail, userEmail, type, timeSort });
-		const countFilters = this.allEmailListFilters({ emailId, name, subject, accountEmail, userEmail, type, timeSort, withCursor: false });
+		const filters = this.allEmailListFilters({ emailId, name, subject, content, accountEmail, userEmail, type, timeSort });
+		const countFilters = this.allEmailListFilters({ emailId, name, subject, content, accountEmail, userEmail, type, timeSort, withCursor: false });
 		const columns = full ? emailListColumns : emailBriefColumns;
 
 		const query = orm(c).select({ ...columns, userEmail: user.email })
