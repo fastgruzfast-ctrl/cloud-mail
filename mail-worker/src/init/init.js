@@ -34,8 +34,44 @@ const dbInit = {
 		await this.v3_3DB(c);
 		await this.v3_4DB(c);
 		await this.v3_5DB(c);
+		await this.v3_6DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_6DB(c) {
+		// 邮件定时备份：mail_backup 表 + setting 新增 backup_cron / backup_keep
+		try {
+			await c.env.db.batch([
+				c.env.db.prepare(`CREATE TABLE IF NOT EXISTS mail_backup (
+					backup_id INTEGER PRIMARY KEY AUTOINCREMENT,
+					file_name TEXT NOT NULL DEFAULT '',
+					kv_key TEXT NOT NULL DEFAULT '',
+					email_count INTEGER NOT NULL DEFAULT 0,
+					size INTEGER NOT NULL DEFAULT 0,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+				)`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN backup_cron INTEGER NOT NULL DEFAULT 0;`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN backup_keep INTEGER NOT NULL DEFAULT 7;`),
+			]);
+		} catch (e) {
+			console.warn(`v3_6DB 跳过：${e.message}`);
+		}
+		// 已有部署补备份权限点（新库在 perm 初始化时已包含）
+		try {
+			const { total } = await c.env.db.prepare(
+				`SELECT COUNT(*) as total FROM perm WHERE perm_key IN ('backup:query','backup:set')`
+			).first();
+			if (!total) {
+				await c.env.db.prepare(
+					`INSERT INTO perm (name, perm_key, pid, type, sort) VALUES
+					('备份查看', 'backup:query', 27, 2, 1),
+					('备份管理', 'backup:set', 27, 2, 2)`
+				).run();
+			}
+		} catch (e) {
+			console.warn(`v3_6DB 权限跳过：${e.message}`);
+		}
 	},
 
 	async v3_5DB(c) {
@@ -622,7 +658,9 @@ const dbInit = {
         (27, '邮件列表', '', 0, 1, 4),
         (28, '邮件查看', 'all-email:query', 27, 2, 0),
         (29, '邮件删除', 'all-email:delete', 27, 2, 0),
-				(30, '身份添加', 'role:add', 13, 2, -1)
+				(30, '身份添加', 'role:add', 13, 2, -1),
+				(31, '备份查看', 'backup:query', 27, 2, 1),
+				(32, '备份管理', 'backup:set', 27, 2, 2)
       `).run();
 		}
 
@@ -830,6 +868,17 @@ const dbInit = {
 			name TEXT NOT NULL DEFAULT '',
 			email TEXT NOT NULL DEFAULT '',
 			remark TEXT NOT NULL DEFAULT '',
+			create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+		  )
+		`).run();
+
+		await c.env.db.prepare(`
+		  CREATE TABLE IF NOT EXISTS mail_backup (
+			backup_id INTEGER PRIMARY KEY AUTOINCREMENT,
+			file_name TEXT NOT NULL DEFAULT '',
+			kv_key TEXT NOT NULL DEFAULT '',
+			email_count INTEGER NOT NULL DEFAULT 0,
+			size INTEGER NOT NULL DEFAULT 0,
 			create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
 		  )
 		`).run();

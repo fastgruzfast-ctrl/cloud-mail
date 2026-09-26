@@ -226,6 +226,8 @@ const settingService = {
 			googleClientId: settingRow.googleClientId,
 			googleSwitch: settingRow.googleSwitch,
 			minEmailPrefix: settingRow.minEmailPrefix,
+			backupCron: settingRow.backupCron,
+			backupKeep: settingRow.backupKeep,
 			projectLink: settingRow.projectLink
 		};
 	},

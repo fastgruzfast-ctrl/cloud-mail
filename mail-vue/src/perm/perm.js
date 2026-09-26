@@ -118,5 +118,15 @@ const routers = {
             name: 'analysis',
             menu: true
         }
+    }],
+    'backup:query': [{
+        path: '/backup',
+        name: 'backup',
+        component: () => import('@/views/backup/index.vue'),
+        meta: {
+            title: 'mailBackup',
+            name: 'backup',
+            menu: true
+        }
     }]
 }

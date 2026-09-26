@@ -7,6 +7,7 @@ import kvObjService from './service/kv-obj-service';
 import oauthService from './service/oauth-service';
 import analysisService from './service/analysis-service';
 import scheduleService from './service/schedule-service';
+import backupService from './service/backup-service';
 export default {
 	 async fetch(req, env, ctx) {
 
@@ -42,5 +43,6 @@ export default {
 		await emailService.autoClean({ env })
 		await analysisService.refreshEchartsCache({ env })
 		await oauthService.clearNoBindOathUser({ env })
+		await backupService.checkAndRun(env)
 	},
 };

@@ -84,6 +84,11 @@
           <Icon icon="eos-icons:system-ok-outlined" width="18" height="18" style="margin-left: 2px" />
           <span class="menu-name" style="margin-left: 17px">{{$t('SystemSettings')}}</span>
         </el-menu-item>
+        <el-menu-item @click="router.push({name: 'backup'})" index="backup" v-perm="'backup:query'"
+                      :class="route.meta.name === 'backup' ? 'choose-item' : ''">
+          <Icon icon="material-symbols:backup-outline" width="20" height="20" style="margin-left: 1px" />
+          <span class="menu-name" style="margin-left: 16px">{{$t('mailBackup')}}</span>
+        </el-menu-item>
       </el-menu>
     </div>
   </el-scrollbar>

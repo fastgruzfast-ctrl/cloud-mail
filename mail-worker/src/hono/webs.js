@@ -27,4 +27,5 @@ import '../api/autoreply-api'
 import '../api/tag-api'
 import '../api/contact-api'
 import '../api/ai-api'
+import '../api/backup-api'
 export default app;
