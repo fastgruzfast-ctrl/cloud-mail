@@ -69,6 +69,14 @@ export const setting = sqliteTable('setting', {
 	webhookRetry: integer('webhook_retry').default(0).notNull(),
 	webhookSecret: text('webhook_secret').default('').notNull(),
 	backupCron: integer('backup_cron').default(0).notNull(),
-	backupKeep: integer('backup_keep').default(7).notNull()
+	backupKeep: integer('backup_keep').default(7).notNull(),
+	quotaEnabled: integer('quota_enabled').default(0).notNull(),
+	siteUrl: text('site_url').default('').notNull(),
+	undoSeconds: integer('undo_seconds').default(30).notNull(),
+	approvalEnabled: integer('approval_enabled').default(0).notNull(),
+	approvalUids: text('approval_uids').default('').notNull(),
+	auditEnabled: integer('audit_enabled').default(0).notNull(),
+	auditWords: text('audit_words').default('').notNull(),
+	auditMode: text('audit_mode').default('warn').notNull()
 });
 export default setting

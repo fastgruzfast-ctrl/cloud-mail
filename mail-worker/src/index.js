@@ -8,6 +8,7 @@ import oauthService from './service/oauth-service';
 import analysisService from './service/analysis-service';
 import scheduleService from './service/schedule-service';
 import backupService from './service/backup-service';
+import delayedService from './service/delayed-service';
 export default {
 	 async fetch(req, env, ctx) {
 
@@ -34,6 +35,11 @@ export default {
 
 		if (c.cron === '*/5 * * * *') {
 			await scheduleService.processDue({ env })
+			return;
+		}
+
+		if (c.cron === '* * * * *') {
+			await delayedService.processDue({ env });
 			return;
 		}
 

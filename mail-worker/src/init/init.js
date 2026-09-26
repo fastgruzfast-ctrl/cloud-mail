@@ -35,8 +35,110 @@ const dbInit = {
 		await this.v3_4DB(c);
 		await this.v3_5DB(c);
 		await this.v3_6DB(c);
+		await this.v3_7DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
+	},
+
+	async v3_7DB(c) {
+		// 6 新功能：send_quota / send_daily_stat / unsubscribe / delayed_send / mail_approval / audit_log 表 + setting 新增列 + 权限点
+		try {
+			await c.env.db.batch([
+				c.env.db.prepare(`CREATE TABLE IF NOT EXISTS send_quota (
+					domain TEXT PRIMARY KEY,
+					day_limit INTEGER NOT NULL DEFAULT 100,
+					warmup_enabled INTEGER NOT NULL DEFAULT 0,
+					warmup_start TEXT NOT NULL DEFAULT '',
+					warmup_start_limit INTEGER NOT NULL DEFAULT 20,
+					warmup_step INTEGER NOT NULL DEFAULT 20,
+					warmup_max INTEGER NOT NULL DEFAULT 100,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+				)`),
+				c.env.db.prepare(`CREATE TABLE IF NOT EXISTS send_daily_stat (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					date TEXT NOT NULL DEFAULT '',
+					domain TEXT NOT NULL DEFAULT '',
+					sent INTEGER NOT NULL DEFAULT 0
+				)`),
+				c.env.db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS send_daily_stat_date_domain ON send_daily_stat (date, domain)`),
+				c.env.db.prepare(`CREATE TABLE IF NOT EXISTS unsubscribe (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					email TEXT NOT NULL DEFAULT '',
+					domain TEXT NOT NULL DEFAULT '',
+					token TEXT UNIQUE,
+					status INTEGER NOT NULL DEFAULT 0,
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+				)`),
+				c.env.db.prepare(`CREATE TABLE IF NOT EXISTS delayed_send (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					user_id INTEGER NOT NULL DEFAULT 0,
+					account_id INTEGER NOT NULL DEFAULT 0,
+					to_email TEXT NOT NULL DEFAULT '',
+					subject TEXT NOT NULL DEFAULT '',
+					content TEXT NOT NULL DEFAULT '',
+					text TEXT NOT NULL DEFAULT '',
+					attachments TEXT NOT NULL DEFAULT '[]',
+					send_at TEXT NOT NULL DEFAULT '',
+					status TEXT NOT NULL DEFAULT 'pending',
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+				)`),
+				c.env.db.prepare(`CREATE TABLE IF NOT EXISTS mail_approval (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					user_id INTEGER,
+					account_id INTEGER,
+					to_email TEXT NOT NULL DEFAULT '',
+					subject TEXT NOT NULL DEFAULT '',
+					content TEXT NOT NULL DEFAULT '',
+					text TEXT NOT NULL DEFAULT '',
+					attachments TEXT NOT NULL DEFAULT '[]',
+					status TEXT NOT NULL DEFAULT 'pending',
+					reason TEXT NOT NULL DEFAULT '',
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+				)`),
+				c.env.db.prepare(`CREATE TABLE IF NOT EXISTS audit_log (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					user_id INTEGER,
+					user_email TEXT NOT NULL DEFAULT '',
+					to_email TEXT NOT NULL DEFAULT '',
+					subject TEXT NOT NULL DEFAULT '',
+					words TEXT NOT NULL DEFAULT '',
+					action TEXT NOT NULL DEFAULT '',
+					create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+				)`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN quota_enabled INTEGER NOT NULL DEFAULT 0;`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN site_url TEXT NOT NULL DEFAULT '';`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN undo_seconds INTEGER NOT NULL DEFAULT 30;`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN approval_enabled INTEGER NOT NULL DEFAULT 0;`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN approval_uids TEXT NOT NULL DEFAULT '';`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN audit_enabled INTEGER NOT NULL DEFAULT 0;`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN audit_words TEXT NOT NULL DEFAULT '';`),
+				c.env.db.prepare(`ALTER TABLE setting ADD COLUMN audit_mode TEXT NOT NULL DEFAULT 'warn';`),
+			]);
+		} catch (e) {
+			console.warn(`v3_7DB 跳过：${e.message}`);
+		}
+		// 已有部署补新功能权限点（新库在 perm 初始化时已包含）
+		try {
+			const { total } = await c.env.db.prepare(
+				`SELECT COUNT(*) as total FROM perm WHERE perm_key IN ('quota:query','quota:set','delivery:query','unsubscribe:query','unsubscribe:set','approval:query','approval:set','audit:query','audit:set')`
+			).first();
+			if (!total) {
+				await c.env.db.prepare(
+					`INSERT INTO perm (perm_id, name, perm_key, pid, type, sort) VALUES
+					(33, '配额查看', 'quota:query', 27, 2, 1),
+					(34, '配额管理', 'quota:set', 27, 2, 2),
+					(35, '投递查看', 'delivery:query', 27, 2, 3),
+					(36, '退订查看', 'unsubscribe:query', 27, 2, 4),
+					(37, '退订管理', 'unsubscribe:set', 27, 2, 5),
+					(38, '审批查看', 'approval:query', 27, 2, 6),
+					(39, '审批管理', 'approval:set', 27, 2, 7),
+					(40, '审计查看', 'audit:query', 27, 2, 8),
+					(41, '审计管理', 'audit:set', 27, 2, 9)`
+				).run();
+			}
+		} catch (e) {
+			console.warn(`v3_7DB 权限跳过：${e.message}`);
+		}
 	},
 
 	async v3_6DB(c) {
@@ -660,7 +762,16 @@ const dbInit = {
         (29, '邮件删除', 'all-email:delete', 27, 2, 0),
 				(30, '身份添加', 'role:add', 13, 2, -1),
 				(31, '备份查看', 'backup:query', 27, 2, 1),
-				(32, '备份管理', 'backup:set', 27, 2, 2)
+				(32, '备份管理', 'backup:set', 27, 2, 2),
+				(33, '配额查看', 'quota:query', 27, 2, 1),
+				(34, '配额管理', 'quota:set', 27, 2, 2),
+				(35, '投递查看', 'delivery:query', 27, 2, 3),
+				(36, '退订查看', 'unsubscribe:query', 27, 2, 4),
+				(37, '退订管理', 'unsubscribe:set', 27, 2, 5),
+				(38, '审批查看', 'approval:query', 27, 2, 6),
+				(39, '审批管理', 'approval:set', 27, 2, 7),
+				(40, '审计查看', 'audit:query', 27, 2, 8),
+				(41, '审计管理', 'audit:set', 27, 2, 9)
       `).run();
 		}
 
@@ -879,6 +990,88 @@ const dbInit = {
 			kv_key TEXT NOT NULL DEFAULT '',
 			email_count INTEGER NOT NULL DEFAULT 0,
 			size INTEGER NOT NULL DEFAULT 0,
+			create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+		  )
+		`).run();
+
+		await c.env.db.prepare(`
+		  CREATE TABLE IF NOT EXISTS send_quota (
+			domain TEXT PRIMARY KEY,
+			day_limit INTEGER NOT NULL DEFAULT 100,
+			warmup_enabled INTEGER NOT NULL DEFAULT 0,
+			warmup_start TEXT NOT NULL DEFAULT '',
+			warmup_start_limit INTEGER NOT NULL DEFAULT 20,
+			warmup_step INTEGER NOT NULL DEFAULT 20,
+			warmup_max INTEGER NOT NULL DEFAULT 100,
+			create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+		  )
+		`).run();
+
+		await c.env.db.prepare(`
+		  CREATE TABLE IF NOT EXISTS send_daily_stat (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			date TEXT NOT NULL DEFAULT '',
+			domain TEXT NOT NULL DEFAULT '',
+			sent INTEGER NOT NULL DEFAULT 0
+		  )
+		`).run();
+
+		await c.env.db.prepare(`
+		  CREATE UNIQUE INDEX IF NOT EXISTS send_daily_stat_date_domain ON send_daily_stat (date, domain)
+		`).run();
+
+		await c.env.db.prepare(`
+		  CREATE TABLE IF NOT EXISTS unsubscribe (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			email TEXT NOT NULL DEFAULT '',
+			domain TEXT NOT NULL DEFAULT '',
+			token TEXT UNIQUE,
+			status INTEGER NOT NULL DEFAULT 0,
+			create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+		  )
+		`).run();
+
+		await c.env.db.prepare(`
+		  CREATE TABLE IF NOT EXISTS delayed_send (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL DEFAULT 0,
+			account_id INTEGER NOT NULL DEFAULT 0,
+			to_email TEXT NOT NULL DEFAULT '',
+			subject TEXT NOT NULL DEFAULT '',
+			content TEXT NOT NULL DEFAULT '',
+			text TEXT NOT NULL DEFAULT '',
+			attachments TEXT NOT NULL DEFAULT '[]',
+			send_at TEXT NOT NULL DEFAULT '',
+			status TEXT NOT NULL DEFAULT 'pending',
+			create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+		  )
+		`).run();
+
+		await c.env.db.prepare(`
+		  CREATE TABLE IF NOT EXISTS mail_approval (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER,
+			account_id INTEGER,
+			to_email TEXT NOT NULL DEFAULT '',
+			subject TEXT NOT NULL DEFAULT '',
+			content TEXT NOT NULL DEFAULT '',
+			text TEXT NOT NULL DEFAULT '',
+			attachments TEXT NOT NULL DEFAULT '[]',
+			status TEXT NOT NULL DEFAULT 'pending',
+			reason TEXT NOT NULL DEFAULT '',
+			create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+		  )
+		`).run();
+
+		await c.env.db.prepare(`
+		  CREATE TABLE IF NOT EXISTS audit_log (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER,
+			user_email TEXT NOT NULL DEFAULT '',
+			to_email TEXT NOT NULL DEFAULT '',
+			subject TEXT NOT NULL DEFAULT '',
+			words TEXT NOT NULL DEFAULT '',
+			action TEXT NOT NULL DEFAULT '',
 			create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
 		  )
 		`).run();

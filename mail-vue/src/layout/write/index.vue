@@ -73,6 +73,7 @@
             </el-dropdown>
             <el-button @click="templateManageShow = true" style="margin-right: 8px">{{ $t('manageTemplates') }}</el-button>
             <el-button @click="openSchedule" style="margin-right: 8px">{{ $t('scheduledSend') }}</el-button>
+            <el-checkbox v-model="form.marketing" style="margin-right: 8px">{{ $t('marketingEmail') }}</el-checkbox>
             <el-button type="primary" @click="sendEmail" v-if="form.sendType === 'reply'">{{ $t('reply') }}</el-button>
             <el-button type="primary" @click="sendEmail" v-else-if="form.sendType === 'forward'">{{ $t('forward') }}</el-button>
             <el-button type="primary" @click="sendEmail" v-else>{{ $t('send') }}</el-button>
@@ -143,6 +144,7 @@ import {h, nextTick, onMounted, onUnmounted, reactive, ref, toRaw, computed} fro
 import {Icon} from "@iconify/vue";
 import {useUserStore} from "@/store/user.js";
 import {emailSend} from "@/request/email.js";
+import {delayedCancel} from "@/request/unsubscribe.js";
 import {templateList, templateAdd, templateUpdate, templateDelete} from "@/request/template.js";
 import {scheduleAdd} from "@/request/schedule.js";
 import {contactSearch} from "@/request/contact.js";
@@ -205,6 +207,7 @@ const form = reactive({
   emailId: 0,
   attachments: [],
   draftId: null,
+  marketing: false,
 })
 
 const selectRecipientList = ref([])
@@ -479,6 +482,15 @@ async function sendEmail() {
     return
   }
 
+  if (form.marketing && form.receiveEmail.length !== 1) {
+    ElMessage({
+      message: t('marketingSingleRecipient'),
+      type: 'error',
+      plain: true,
+    })
+    return
+  }
+
   if (!form.subject) {
     ElMessage({
       message: t('emptySubjectMsg'),
@@ -535,7 +547,15 @@ async function sendEmail() {
 
   emailSend(form, (e) => {
     percent.value = Math.round((e.loaded * 98) / e.total)
-  }).then(emailList => {
+  }).then(res => {
+    // 延迟发送：显示可撤销倒计时通知
+    if (res && res.delayed === true) {
+      showUndoTip(res.id, Number(res.undoSeconds) || 30)
+      show.value = false
+      resetForm()
+      return
+    }
+    const emailList = res
     const email = emailList[0]
     emailList.forEach(item => {
       emailStore.sendScroll?.addItem(item)
@@ -581,6 +601,40 @@ async function sendEmail() {
   })
 }
 
+function showUndoTip(delayedId, undoSeconds) {
+  const remain = ref(undoSeconds)
+  const msgRef = ref(null)
+  const timer = setInterval(() => {
+    remain.value -= 1
+    if (msgRef.value) msgRef.value.textContent = t('delayedSentTip', {seconds: remain.value})
+    if (remain.value <= 0) {
+      clearInterval(timer)
+      note.close()
+    }
+  }, 1000)
+  const note = ElNotification({
+    title: t('sendSuccessMsg'),
+    type: 'success',
+    duration: undoSeconds * 1000,
+    position: 'bottom-right',
+    onClose: () => clearInterval(timer),
+    message: h('div', {style: 'display:flex;align-items:center;gap:10px'}, [
+      h('span', {ref: msgRef}, t('delayedSentTip', {seconds: undoSeconds})),
+      h('el-button', {
+        size: 'small',
+        type: 'danger',
+        onClick: () => {
+          delayedCancel({id: delayedId}).then(() => {
+            ElMessage({message: t('sendCancelled'), type: 'success', plain: true})
+            clearInterval(timer)
+            note.close()
+          })
+        }
+      }, () => t('cancelSend')),
+    ]),
+  })
+}
+
 function addRecipientRecord() {
   writerStore.sendRecipientRecord = writerStore.sendRecipientRecord.filter(
       email => !form.receiveEmail.includes(email)
@@ -594,6 +648,7 @@ function resetForm() {
   form.receiveEmail = []
   form.subject = ''
   form.content = ''
+  form.marketing = false
   form.manyType = null
   form.attachments = []
   form.sendType = ''

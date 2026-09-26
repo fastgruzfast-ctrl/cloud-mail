@@ -16,6 +16,7 @@ const exclude = [
 	'/webhooks',
 	'/init',
 	'/public/genToken',
+	'/public/unsubscribe',
 	'/telegram',
 	'/test',
 	'/oauth'
@@ -63,12 +64,28 @@ const requirePerms = [
 	'/backup/download',
 	'/backup/run',
 	'/backup/remove',
-	'/backup/setting'
+	'/backup/setting',
+	'/unsubscribe/list',
+	'/unsubscribe/remove',
+	'/unsubscribe/setting',
+	'/delayed/cancel',
+	'/quota/list',
+	'/quota/save',
+	'/quota/setting',
+	'/quota/remove',
+	'/delivery/stats',
+	'/delivery/bounces',
+	'/approval/list',
+	'/approval/setting',
+	'/approval/approve',
+	'/approval/reject',
+	'/audit/setting',
+	'/audit/logs'
 ];
 
 const premKey = {
 	'email:delete': ['/email/delete'],
-	'email:send': ['/email/send'],
+	'email:send': ['/email/send','/delayed/cancel'],
 	'account:add': ['/account/add'],
 	'account:query': ['/account/list'],
 	'account:delete': ['/account/delete'],
@@ -94,6 +111,15 @@ const premKey = {
 	'reg-key:delete': ['/regKey/delete','/regKey/clearNotUse'],
 	'backup:query': ['/backup/list','/backup/download'],
 	'backup:set': ['/backup/run','/backup/remove','/backup/setting'],
+	'unsubscribe:query': ['/unsubscribe/list','/unsubscribe/setting'],
+	'unsubscribe:set': ['/unsubscribe/remove','/unsubscribe/setting'],
+	'quota:query': ['/quota/list','/quota/setting'],
+	'quota:set': ['/quota/save','/quota/setting','/quota/remove'],
+	'delivery:query': ['/delivery/stats','/delivery/bounces'],
+	'approval:query': ['/approval/list','/approval/setting'],
+	'approval:set': ['/approval/setting','/approval/approve','/approval/reject'],
+	'audit:query': ['/audit/logs','/audit/setting'],
+	'audit:set': ['/audit/setting'],
 };
 
 app.use('*', async (c, next) => {

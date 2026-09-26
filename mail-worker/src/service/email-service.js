@@ -23,6 +23,7 @@ import domainUtils from '../utils/domain-uitls';
 import account from "../entity/account";
 import { att } from '../entity/att';
 import telegramService from './telegram-service';
+import sendGuard from './send-guard';
 
 const emailService = {
 
@@ -260,7 +261,7 @@ const emailService = {
 	},
 
 	//邮件发送
-	async send(c, params, userId) {
+	async send(c, params, userId, opts = {}) {
 
 		let {
 			accountId, //发送账号id
@@ -275,8 +276,6 @@ const emailService = {
 		} = params;
 
 		const { resendTokens, r2Domain, send, domainList } = await settingService.query(c);
-
-		let { imageDataList, html } = await attService.toImageUrlHtml(c, content);
 
 		//判断是否关闭发件功能
 		if (send === settingConst.send.CLOSE) {
@@ -339,6 +338,25 @@ const emailService = {
 
 		}
 
+		//发信守卫：退订过滤 → 审计 → 审批 → 配额 → 撤销延迟（可改 params 或短路返回）
+		const guardResult = await sendGuard.beforeSend(c, {
+			params: { accountId, name, sendType, emailId, receiveEmail, text, content, subject, attachments },
+			userId,
+			userRow,
+			accountRow,
+			opts,
+			allInternal,
+		});
+		if (guardResult && (guardResult.delayed || guardResult.held)) {
+			return guardResult;
+		}
+		if (guardResult && guardResult.params) {
+			({ accountId, name, sendType, emailId, receiveEmail, text, content, subject, attachments } = guardResult.params);
+		}
+		const extraHeaders = (guardResult && guardResult.params && guardResult.params.extraHeaders) || undefined;
+
+		let { imageDataList, html } = await attService.toImageUrlHtml(c, content);
+
 		const domain = emailUtils.getDomain(accountRow.email);
 		const resendToken = resendTokens[domain];
 		const useCloudflareEmail = !!c.env.email;
@@ -383,7 +401,8 @@ const emailService = {
 					html,
 					attachments: [...imageDataList, ...attachments],
 					sendType,
-					messageId: emailRow.messageId
+					messageId: emailRow.messageId,
+					headers: extraHeaders
 				});
 			} else {
 				sendResult = await this.sendByResend(resendToken, {
@@ -395,7 +414,8 @@ const emailService = {
 					html,
 					attachments: [...imageDataList, ...attachments],
 					sendType,
-					messageId: emailRow.messageId
+					messageId: emailRow.messageId,
+					headers: extraHeaders
 				});
 			}
 
@@ -482,6 +502,9 @@ const emailService = {
 			await c.env.kv.put(kvConst.SEND_DAY_COUNT + dateStr, JSON.stringify(daySendTotal), { expirationTtl: 60 * 60 * 24 });
 		}
 
+		//发信成功后：配额统计
+		await sendGuard.afterSend(c, { accountRow, receiveEmail, allInternal });
+
 		return [ emailResult ];
 	},
 
@@ -512,6 +535,10 @@ const emailService = {
 			};
 		}
 
+		if (params.headers) {
+			sendForm.headers = { ...(sendForm.headers || {}), ...params.headers };
+		}
+
 		const result = await c.env.email.send(sendForm);
 
 		return {
@@ -538,6 +565,10 @@ const emailService = {
 				'in-reply-to': params.messageId,
 				'references': params.messageId
 			};
+		}
+
+		if (params.headers) {
+			sendForm.headers = { ...(sendForm.headers || {}), ...params.headers };
 		}
 
 		return await resend.emails.send(sendForm);

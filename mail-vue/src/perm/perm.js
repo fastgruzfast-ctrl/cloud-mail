@@ -128,5 +128,55 @@ const routers = {
             name: 'backup',
             menu: true
         }
+    }],
+    'quota:query': [{
+        path: '/quota',
+        name: 'quota',
+        component: () => import('@/views/quota/index.vue'),
+        meta: {
+            title: 'sendQuota',
+            name: 'quota',
+            menu: true
+        }
+    }],
+    'delivery:query': [{
+        path: '/delivery',
+        name: 'delivery',
+        component: () => import('@/views/delivery/index.vue'),
+        meta: {
+            title: 'deliveryStats',
+            name: 'delivery',
+            menu: true
+        }
+    }],
+    'unsubscribe:query': [{
+        path: '/unsubscribe',
+        name: 'unsubscribe',
+        component: () => import('@/views/unsubscribe/index.vue'),
+        meta: {
+            title: 'unsubscribeList',
+            name: 'unsubscribe',
+            menu: true
+        }
+    }],
+    'approval:query': [{
+        path: '/approval',
+        name: 'approval',
+        component: () => import('@/views/approval/index.vue'),
+        meta: {
+            title: 'mailApproval',
+            name: 'approval',
+            menu: true
+        }
+    }],
+    'audit:query': [{
+        path: '/audit',
+        name: 'audit',
+        component: () => import('@/views/audit/index.vue'),
+        meta: {
+            title: 'sendAudit',
+            name: 'audit',
+            menu: true
+        }
     }]
 }

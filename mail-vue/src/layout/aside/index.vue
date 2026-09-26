@@ -89,6 +89,31 @@
           <Icon icon="material-symbols:backup-outline" width="20" height="20" style="margin-left: 1px" />
           <span class="menu-name" style="margin-left: 16px">{{$t('mailBackup')}}</span>
         </el-menu-item>
+        <el-menu-item @click="router.push({name: 'quota'})" index="quota" v-perm="'quota:query'"
+                      :class="route.meta.name === 'quota' ? 'choose-item' : ''">
+          <Icon icon="material-symbols:gauge-outline" width="20" height="20" style="margin-left: 1px" />
+          <span class="menu-name" style="margin-left: 16px">{{$t('sendQuota')}}</span>
+        </el-menu-item>
+        <el-menu-item @click="router.push({name: 'delivery'})" index="delivery" v-perm="'delivery:query'"
+                      :class="route.meta.name === 'delivery' ? 'choose-item' : ''">
+          <Icon icon="material-symbols:monitoring" width="20" height="20" style="margin-left: 1px" />
+          <span class="menu-name" style="margin-left: 16px">{{$t('deliveryStats')}}</span>
+        </el-menu-item>
+        <el-menu-item @click="router.push({name: 'unsubscribe'})" index="unsubscribe" v-perm="'unsubscribe:query'"
+                      :class="route.meta.name === 'unsubscribe' ? 'choose-item' : ''">
+          <Icon icon="material-symbols:unsubscribe-outline" width="20" height="20" style="margin-left: 1px" />
+          <span class="menu-name" style="margin-left: 16px">{{$t('unsubscribeList')}}</span>
+        </el-menu-item>
+        <el-menu-item @click="router.push({name: 'approval'})" index="approval" v-perm="'approval:query'"
+                      :class="route.meta.name === 'approval' ? 'choose-item' : ''">
+          <Icon icon="material-symbols:approval-outline" width="20" height="20" style="margin-left: 1px" />
+          <span class="menu-name" style="margin-left: 16px">{{$t('mailApproval')}}</span>
+        </el-menu-item>
+        <el-menu-item @click="router.push({name: 'audit'})" index="audit" v-perm="'audit:query'"
+                      :class="route.meta.name === 'audit' ? 'choose-item' : ''">
+          <Icon icon="material-symbols:shield-outline" width="20" height="20" style="margin-left: 1px" />
+          <span class="menu-name" style="margin-left: 16px">{{$t('sendAudit')}}</span>
+        </el-menu-item>
       </el-menu>
     </div>
   </el-scrollbar>
