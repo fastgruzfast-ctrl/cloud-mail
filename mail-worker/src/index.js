@@ -35,6 +35,16 @@ export default {
 
 		if (c.cron === '*/5 * * * *') {
 			await scheduleService.processDue({ env })
+			// 原每小时任务并入 5 分钟档（免费版 cron 触发器配额限制）：每小时整点后 5 分钟内跑一次
+			if (new Date().getUTCMinutes() < 5) {
+				await verifyRecordService.clearRecord({ env })
+				await userService.resetDaySendCount({ env })
+				await emailService.completeReceiveAll({ env })
+				await emailService.autoClean({ env })
+				await analysisService.refreshEchartsCache({ env })
+				await oauthService.clearNoBindOathUser({ env })
+				await backupService.checkAndRun(env)
+			}
 			return;
 		}
 
@@ -43,6 +53,7 @@ export default {
 			return;
 		}
 
+		// 兼容旧的 "0 * * * *" 触发器（已从 wrangler.toml 移除，保留兜底）
 		await verifyRecordService.clearRecord({ env })
 		await userService.resetDaySendCount({ env })
 		await emailService.completeReceiveAll({ env })
