@@ -290,6 +290,9 @@ function setName() {
   setNameLoading.value = true
   accountSetName(account.accountId, name).then(() => {
     account.name = name
+    if (accountStore.currentAccountId === account.accountId) {
+      accountStore.currentAccount.name = name
+    }
     setNameShow.value = false
 
     if (account.accountId === userStore.user.account.accountId) {

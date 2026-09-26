@@ -366,10 +366,8 @@ const emailService = {
 			throw new BizError(t('noSendProvider'));
 		}
 
-		//没有发件人名字自动截取
-		if (!name) {
-			name = emailUtils.getName(accountRow.email);
-		}
+		//发件人名字始终以账号当前设置为准（前端传的可能是改名前的旧值）
+		name = accountRow.name || name || emailUtils.getName(accountRow.email);
 
 		let emailRow = {
 			messageId: null

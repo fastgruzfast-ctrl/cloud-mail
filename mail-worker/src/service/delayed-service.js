@@ -48,6 +48,17 @@ const delayedService = {
 	/** 定时任务（每分钟）：发送到期的延迟邮件 */
 	async processDue(c) {
 		const now = dayjs().format('YYYY-MM-DD HH:mm:ss');
+		// 回收孤儿：上次执行崩溃导致卡在 sending 超过 10 分钟的，重置为 pending
+		try {
+			const staleLine = dayjs().subtract(10, 'minute').format('YYYY-MM-DD HH:mm:ss');
+			await orm(c).update(delayedSend).set({ status: 'pending' })
+				.where(and(
+					eq(delayedSend.status, 'sending'),
+					lte(delayedSend.sendAt, staleLine)
+				)).run();
+		} catch (e) {
+			console.error('回收延迟发送孤儿记录异常: ', e);
+		}
 		let dueList = [];
 		try {
 			dueList = await orm(c).select().from(delayedSend)
@@ -62,6 +73,20 @@ const delayedService = {
 		// 动态 import 避免与 email-service 循环依赖
 		const emailService = (await import('./email-service.js')).default;
 		for (const item of dueList) {
+			// 原子认领：pending -> sending，只有抢到的才真正发送；
+			// 避免多个 cron 执行并发（或上次执行崩溃后）重复发送同一封邮件
+			let claimed = false;
+			try {
+				const cr = await orm(c).update(delayedSend).set({ status: 'sending' })
+					.where(and(
+						eq(delayedSend.id, item.id),
+						eq(delayedSend.status, 'pending')
+					)).run();
+				claimed = Number(cr?.meta?.changes || 0) > 0;
+			} catch (e) {
+				console.error('认领延迟发送记录异常:', item.id, e.message);
+			}
+			if (!claimed) continue;
 			try {
 				let attachments = [];
 				try {
