@@ -614,9 +614,9 @@ function showUndoTip(delayedId, undoSeconds) {
   // 不要在 render 之外给 h() 创建的 vnode 挂 ref，Vue 3.5 生产构建下 setRef 会因 owner 为 null 而崩溃
   const CountdownMsg = {
     setup() {
-      return () => h('div', {style: 'display:flex;align-items:center;gap:10px'}, [
+      return () => h('div', {style: 'display:flex;align-items:center;justify-content:space-between;gap:12px'}, [
         h('span', {}, t('delayedSentTip', {seconds: remain.value})),
-        h('el-button', {
+        h(ElButton, {
           size: 'small',
           type: 'danger',
           onClick: () => {
