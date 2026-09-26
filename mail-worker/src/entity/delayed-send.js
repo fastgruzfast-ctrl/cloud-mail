@@ -12,6 +12,7 @@ export const delayedSend = sqliteTable('delayed_send', {
 	attachments: text('attachments').default('[]').notNull(),
 	sendAt: text('send_at').default('').notNull(),
 	status: text('status').default('pending').notNull(),
+	message: text('message').default('').notNull(),
 	createTime: text('create_time')
 		.notNull()
 		.default(sql`CURRENT_TIMESTAMP`),

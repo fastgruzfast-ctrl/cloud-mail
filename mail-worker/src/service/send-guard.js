@@ -3,7 +3,10 @@ import auditService from './audit-service';
 import approvalService from './approval-service';
 import quotaService from './quota-service';
 import delayedService from './delayed-service';
+import settingService from './setting-service';
 import emailUtils from '../utils/email-utils';
+import BizError from '../error/biz-error';
+import { t } from '../i18n/i18n';
 
 /**
  * 发信守卫：emailService.send 在角色检查之后、实际发信之前调用。
@@ -53,6 +56,15 @@ const sendGuard = {
 
 		// ⑤ 撤销延迟：暂存 pending，undo_seconds 秒后由定时任务真正发送
 		if (!opts.skipDelay) {
+			// 发信通道预检：发件域名没有可用通道（Resend Token / CF 发信）时直接失败，
+			// 避免前端显示"发送成功"、定时任务真正发送时才静默失败
+			if (!allInternal) {
+				const { resendTokens } = await settingService.query(c);
+				const domain = emailUtils.getDomain(accountRow?.email || '');
+				if (!c.env.email && !resendTokens?.[domain]) {
+					throw new BizError(t('noSendProvider'));
+				}
+			}
 			const delayedId = await delayedService.hold(c, p, userId, p.accountId);
 			if (delayedId) {
 				const s = await unsubscribeService.getSetting(c);

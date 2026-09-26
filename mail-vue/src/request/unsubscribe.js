@@ -19,3 +19,7 @@ export function unsubscribeSettingSave(data) {
 export function delayedCancel(data) {
     return http.post('/delayed/cancel', data)
 }
+
+export function delayedStatus(id) {
+    return http.get('/delayed/status', {params: {id}})
+}

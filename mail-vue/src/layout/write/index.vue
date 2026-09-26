@@ -144,7 +144,7 @@ import {h, nextTick, onMounted, onUnmounted, reactive, ref, toRaw, computed} fro
 import {Icon} from "@iconify/vue";
 import {useUserStore} from "@/store/user.js";
 import {emailSend} from "@/request/email.js";
-import {delayedCancel} from "@/request/unsubscribe.js";
+import {delayedCancel, delayedStatus} from "@/request/unsubscribe.js";
 import {templateList, templateAdd, templateUpdate, templateDelete} from "@/request/template.js";
 import {scheduleAdd} from "@/request/schedule.js";
 import {contactSearch} from "@/request/contact.js";
@@ -603,11 +603,15 @@ async function sendEmail() {
 
 function showUndoTip(delayedId, undoSeconds) {
   const remain = ref(undoSeconds)
+  let cancelled = false
   const timer = setInterval(() => {
     remain.value -= 1
     if (remain.value <= 0) {
       clearInterval(timer)
       note.close()
+      // 撤销窗口结束：定时任务会在 1 分钟内真正发送，轮询确认真实结果；
+      // 失败时弹失败通知，避免"显示成功但实际没发出"的静默失败
+      pollDelayedResult(delayedId)
     }
   }, 1000)
   // 倒计时文案做成独立组件，用响应式 remain 驱动重渲染；
@@ -622,6 +626,7 @@ function showUndoTip(delayedId, undoSeconds) {
           onClick: () => {
             delayedCancel({id: delayedId}).then(() => {
               ElMessage({message: t('sendCancelled'), type: 'success', plain: true})
+              cancelled = true
               clearInterval(timer)
               note.close()
             })
@@ -638,6 +643,33 @@ function showUndoTip(delayedId, undoSeconds) {
     onClose: () => clearInterval(timer),
     message: h(CountdownMsg),
   })
+}
+
+// 撤销窗口结束后轮询延迟发送的真实结果：pending/sending 继续等，
+// sent/cancelled 静默结束，failed 弹出失败通知（带后端记录的失败原因）
+function pollDelayedResult(delayedId) {
+  let tries = 0
+  const maxTries = 10
+  const pollTimer = setInterval(() => {
+    tries += 1
+    delayedStatus(delayedId).then(res => {
+      const status = res && res.status
+      if (status === 'failed') {
+        clearInterval(pollTimer)
+        ElNotification({
+          title: t('sendFailMsg'),
+          type: 'error',
+          message: h('span', {style: 'color: teal'}, (res && res.message) || ''),
+          position: 'bottom-right',
+          duration: 0
+        })
+      } else if (status === 'sent' || status === 'cancelled' || tries >= maxTries) {
+        clearInterval(pollTimer)
+      }
+    }).catch(() => {
+      if (tries >= maxTries) clearInterval(pollTimer)
+    })
+  }, 30000)
 }
 
 function addRecipientRecord() {

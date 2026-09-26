@@ -36,6 +36,7 @@ const dbInit = {
 		await this.v3_5DB(c);
 		await this.v3_6DB(c);
 		await this.v3_7DB(c);
+		await this.v3_8DB(c);
 		await settingService.refresh(c);
 		return c.text('success');
 	},
@@ -80,6 +81,7 @@ const dbInit = {
 					attachments TEXT NOT NULL DEFAULT '[]',
 					send_at TEXT NOT NULL DEFAULT '',
 					status TEXT NOT NULL DEFAULT 'pending',
+					message TEXT NOT NULL DEFAULT '',
 					create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
 				)`),
 				c.env.db.prepare(`CREATE TABLE IF NOT EXISTS mail_approval (
@@ -138,6 +140,15 @@ const dbInit = {
 			}
 		} catch (e) {
 			console.warn(`v3_7DB 权限跳过：${e.message}`);
+		}
+	},
+
+	async v3_8DB(c) {
+		// 延迟发送失败可见：delayed_send 新增 message 列（存定时任务真正发送时的失败原因）
+		try {
+			await c.env.db.prepare(`ALTER TABLE delayed_send ADD COLUMN message TEXT NOT NULL DEFAULT '';`).run();
+		} catch (e) {
+			console.warn(`v3_8DB 跳过：${e.message}`);
 		}
 	},
 
@@ -1043,6 +1054,7 @@ const dbInit = {
 			attachments TEXT NOT NULL DEFAULT '[]',
 			send_at TEXT NOT NULL DEFAULT '',
 			status TEXT NOT NULL DEFAULT 'pending',
+			message TEXT NOT NULL DEFAULT '',
 			create_time DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
 		  )
 		`).run();

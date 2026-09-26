@@ -104,10 +104,22 @@ const delayedService = {
 					.where(eq(delayedSend.id, item.id)).run();
 			} catch (e) {
 				console.error('延迟发送失败:', item.id, e.message);
-				await orm(c).update(delayedSend).set({ status: 'failed' })
+				await orm(c).update(delayedSend).set({
+					status: 'failed',
+					message: String(e?.message || e || '').slice(0, 500),
+				})
 					.where(eq(delayedSend.id, item.id)).run();
 			}
 		}
+	},
+	/** 查询自己的延迟发送记录状态（供前端在撤销窗口结束后确认真实发送结果） */
+	async status(c, id, userId) {
+		const row = await orm(c).select().from(delayedSend)
+			.where(eq(delayedSend.id, Number(id))).get();
+		if (!row || row.userId !== userId) {
+			throw new BizError('记录不存在');
+		}
+		return { status: row.status, message: row.message || '' };
 	},
 };
 
