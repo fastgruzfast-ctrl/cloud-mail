@@ -19,7 +19,7 @@
       <div class="notice icon-item" @click="openNotice">
         <Icon icon="streamline-plump:announcement-megaphone"/>
       </div>
-      <el-dropdown ref="userinfoRef" @visible-change="e => userInfoShow = e" :teleported="false" popper-class="detail-dropdown">
+      <el-dropdown ref="userinfoRef" @visible-change="onDropdownVisible" :teleported="false" popper-class="detail-dropdown">
         <div class="avatar" @click="userInfoHide" >
           <div class="avatar-text">
             <div>{{ formatName(userStore.user.email) }}</div>
@@ -62,6 +62,18 @@
                 </div>
               </div>
             </div>
+            <div class="mailbox-switch" v-if="settingStore.settings.manyEmail === 0 && accounts.length > 1">
+              <div class="mailbox-title">{{ $t('switchMailbox') }}</div>
+              <div class="mailbox-list">
+                <div v-for="item in accounts" :key="item.accountId"
+                     class="mailbox-item"
+                     :class="item.accountId === accountStore.currentAccountId ? 'mailbox-current' : ''"
+                     @click="switchAccount(item)">
+                  <span class="mailbox-email">{{ item.email }}</span>
+                  <Icon v-if="item.accountId === accountStore.currentAccountId" icon="ep:check" width="16" height="16"/>
+                </div>
+              </div>
+            </div>
             <div class="logout">
               <el-button type="primary" :loading="logoutLoading" @click="clickLogout">{{ $t('logOut') }}</el-button>
             </div>
@@ -85,6 +97,8 @@ import {useSettingStore} from "@/store/setting.js";
 import {hasPerm} from "@/perm/perm.js"
 import {useI18n} from "vue-i18n";
 import {setExtend} from "@/utils/day.js"
+import {useAccountStore} from "@/store/account.js";
+import {accountList} from "@/request/account.js";
 
 const {t} = useI18n();
 const route = useRoute();
@@ -94,6 +108,34 @@ const uiStore = useUiStore();
 const logoutLoading = ref(false)
 const userInfoShow = ref(false)
 const userinfoRef = ref({})
+const accountStore = useAccountStore();
+const accounts = ref([])
+const accountsLoading = ref(false)
+
+function onDropdownVisible(e) {
+  userInfoShow.value = e
+  if (e && !accountsLoading.value && settingStore.settings.manyEmail === 0) {
+    loadAccounts()
+  }
+}
+
+function loadAccounts() {
+  accountsLoading.value = true
+  accountList(0, 100, null).then(list => {
+    accounts.value = list || []
+  }).catch(() => {
+  }).finally(() => {
+    accountsLoading.value = false
+  })
+}
+
+function switchAccount(account) {
+  if (account.accountId !== accountStore.currentAccountId) {
+    accountStore.currentAccountId = account.accountId
+    accountStore.currentAccount = account
+  }
+  userinfoRef.value.handleClose()
+}
 
 const accountCount = computed(() => {
   return userStore.user.role.accountCount
@@ -325,9 +367,61 @@ function formatName(email) {
     cursor: pointer;
   }
 
-  .logout {
-    margin-top: 20px;
+  .mailbox-switch {
     width: 100%;
+    margin-top: 12px;
+    padding-left: 10px;
+    padding-right: 10px;
+
+    .mailbox-title {
+      font-size: 12px;
+      color: var(--el-text-color-secondary);
+      margin-bottom: 6px;
+      padding-left: 4px;
+      text-align: left;
+    }
+
+    .mailbox-list {
+      max-height: 180px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .mailbox-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--el-text-color-primary);
+
+      .mailbox-email {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      @media (hover: hover) {
+        &:hover {
+          background: var(--el-fill-color-light);
+        }
+      }
+    }
+
+    .mailbox-current {
+      background: var(--el-color-primary-light-9);
+      color: var(--el-color-primary);
+      font-weight: 500;
+    }
+  }
+
+  .logout {
+    margin-top: 20px;    width: 100%;
     padding-left: 10px;
     padding-right: 10px;
     padding-bottom: 10px;

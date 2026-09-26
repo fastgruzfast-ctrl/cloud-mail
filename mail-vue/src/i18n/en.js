@@ -255,6 +255,7 @@ const en = {
     restoreSuccessMsg: 'Restore successful',
     banRestore: 'Confirm banning {msg}?',
     logOut: 'Sign out',
+    switchMailbox: 'Switch mailbox',
     clearContentConfirm: 'Are you sure to clear all content?',
     emptyRecipientMsg: 'Recipient email cannot be empty',
     emptySubjectMsg: 'Subject cannot be empty',
