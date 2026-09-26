@@ -603,35 +603,40 @@ async function sendEmail() {
 
 function showUndoTip(delayedId, undoSeconds) {
   const remain = ref(undoSeconds)
-  const msgRef = ref(null)
   const timer = setInterval(() => {
     remain.value -= 1
-    if (msgRef.value) msgRef.value.textContent = t('delayedSentTip', {seconds: remain.value})
     if (remain.value <= 0) {
       clearInterval(timer)
       note.close()
     }
   }, 1000)
+  // 倒计时文案做成独立组件，用响应式 remain 驱动重渲染；
+  // 不要在 render 之外给 h() 创建的 vnode 挂 ref，Vue 3.5 生产构建下 setRef 会因 owner 为 null 而崩溃
+  const CountdownMsg = {
+    setup() {
+      return () => h('div', {style: 'display:flex;align-items:center;gap:10px'}, [
+        h('span', {}, t('delayedSentTip', {seconds: remain.value})),
+        h('el-button', {
+          size: 'small',
+          type: 'danger',
+          onClick: () => {
+            delayedCancel({id: delayedId}).then(() => {
+              ElMessage({message: t('sendCancelled'), type: 'success', plain: true})
+              clearInterval(timer)
+              note.close()
+            })
+          }
+        }, () => t('cancelSend')),
+      ])
+    }
+  }
   const note = ElNotification({
     title: t('sendSuccessMsg'),
     type: 'success',
     duration: undoSeconds * 1000,
     position: 'bottom-right',
     onClose: () => clearInterval(timer),
-    message: h('div', {style: 'display:flex;align-items:center;gap:10px'}, [
-      h('span', {ref: msgRef}, t('delayedSentTip', {seconds: undoSeconds})),
-      h('el-button', {
-        size: 'small',
-        type: 'danger',
-        onClick: () => {
-          delayedCancel({id: delayedId}).then(() => {
-            ElMessage({message: t('sendCancelled'), type: 'success', plain: true})
-            clearInterval(timer)
-            note.close()
-          })
-        }
-      }, () => t('cancelSend')),
-    ]),
+    message: h(CountdownMsg),
   })
 }
 
